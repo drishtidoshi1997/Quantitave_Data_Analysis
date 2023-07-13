@@ -1,0 +1,664 @@
+---
+title: "CS5801 Coursework Template Proforma"
+author: "student-id"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+version: 1
+---
+
+# 0. Instructions 
+
+```{r}
+library(ggplot2)
+library(psych)
+library(ggpubr)
+library(mgcv)
+library(tree)
+```
+
+
+# 1. Organise and clean the data
+
+## 1.1 Subset the data into the specific dataset allocated
+
+
+```{r}
+# Assign your student id into the variable SID, for example:
+SID <- 2203898                  # This is an example, replace 2101234 with your actual ID
+SIDoffset <- (SID %% 100) + 1    # Your SID mod 100 + 1
+
+load("house-analysis.RDa")
+# Now subset the housing data set
+# Pick every 100th observation starting from your offset
+# Put into your data frame named mydf (you can rename it)
+mydf <- house.analysis[seq(from=SIDoffset,to=nrow(house.analysis),by=100),]
+```
+
+#Eyeballing the data - Extracting the data to Excel CSV file 
+```{r}
+write.csv(mydf,"Dataset.csv")
+
+```
+
+
+## 1.2 Data quality analysis
+
+#Data Quality Checks
+#Validity of data  
+
+1)Mandatory: It is mandatory for certain columns like price,mq,floor,n_rooms not to be empty 
+
+2)Missing Data: Checking for implausible , incomplete data values like number of rooms = -1
+The number of rooms or bathrooms cannot be -1. It is implausible.
+
+3)Spelling/Numerical Errors : Data observation must not have incorrect notation eg Autonamous instead of Autonomous
+
+4)Data-type: each value has a specific relevant data type eg heating = character string ie autonomous and other
+whereas price,mq,n_rooms are numeric data type
+
+5)Range: Minimum and maximum values for numerical variables like price, n_rooms, n_bathrooms, floor, sq
+
+6)Uniqueness: unique variables should be present in the dataset. Checking for duplicated values.
+
+7)Set-membership constraint: Values must come from a set of discrete values/codes 
+
+8) Referential integrity: Constraints based upon multiple variables, e.g., number of floors with respect to total square meter of property eg 14 rooms cannot have 95 sq metre property.
+
+9) Accuracy: accuracy of data with respect to standard values e.g. 1 floor and 2 room flat cannot be 0 sq meter in area. 
+ 
+10)Completeness: comprehensiveness of the data. Entire data set must deliver useful information and must be complete in itself.
+
+11)Consistency: Ensuring variables measured in the same way from different locations etc eg Price in dollars, area in square meters. Same units of measurement ie universal acceptance.
+ 
+12)Traceability: Data must be traceable(sourced).
+ 
+13)Timeliness: Data updates with time eg Price of property changes over time.It depends on inflation and recession.
+
+14)Variance 
+almost-zero-variance-features: cases when instance have the same value eg variance between id and property prices. 
+
+15)Outliers: these are abnormal or unusual values that is of significant importance.
+
+
+ 
+## 1.3 Data cleaning  
+
+# a) Viewing the data set mydf and column names
+
+```{r}
+
+View(mydf)
+names(mydf)
+
+```
+ 
+
+# b) Examining the first 6 rows and last 6 rows of the data set
+
+```{r}
+
+head(mydf)
+tail(mydf)
+
+```
+
+# c) Looking at the structure of the data frame mydf
+
+Inference : 
+  - Variables has_terrace, has_alarm, has_air_conditioning, has_parking, is_furnished have data type as "Integers". This needs to be converted to data type "Factor"
+  - Heating variable needs to be converted from "character" data type to "factor" data type 
+factor conversion using as.factor
+
+```{r}
+
+str(mydf)
+
+```
+
+
+# Converting given columns to factors
+```{r}
+
+mydf$has_terrace<-as.factor(mydf$has_terrace)
+mydf$has_alarm<-as.factor(mydf$has_alarm)
+mydf$heating<-as.factor(mydf$heating)
+mydf$has_air_conditioning<-as.factor(mydf$has_air_conditioning)
+mydf$has_parking<- as.factor(mydf$has_parking)
+mydf$is_furnished<-as.factor(mydf$is_furnished)
+class(mydf$has_alarm)
+
+
+```
+
+
+# d) Checking of variables by using table function
+
+```{r}
+
+table(mydf$floor)
+table(mydf$n_rooms)
+table(mydf$n_bathrooms)
+table(mydf$has_terrace)
+table(mydf$has_alarm)
+table(mydf$heating)
+table(mydf$has_air_conditioning)
+table(mydf$has_parking)
+table(mydf$is_furnished)
+
+```
+
+# d.1)  Running table(mydf$floor) gives
+14th and 15th floor which probably is an outlier.
+  1   2   3   4   5   6   7   8  14  15 
+441 296  98  32  18   7   7   2   1   1 
+Since the frequency of both 14th and 15th floor is 1. We can ignore the outlier.
+
+# d.2)  Running table(mydf$n_rooms) gives -1 value :
+ -1   2   3   4   5 
+  1 155 319 267 161 
+This is manual typing error and needs to be changed to 1
+
+```{r}
+
+# Display row from the data frame with incorrect value for n_rooms 
+subset(mydf, n_rooms == -1)
+
+#changing -1 to 1
+mydf$n_rooms[mydf$n_rooms== -1 ] <- 1
+table(mydf$n_rooms)
+
+```
+
+# d.3)  Running table(mydf$heating) gives three outputs : 
+autonamous autonomous other 
+It is a spelling mistake for autonomous hence we correct the same
+
+```{r}
+
+# Display row from the data frame with incorrect value for Autonomous
+subset(mydf, heating == "autonamous")
+
+#changing the name of heating 
+mydf$heating[mydf$heating=="autonamous"] <- "autonomous"
+table(mydf$heating)
+
+```
+
+# e) Checking for duplicate values
+
+```{r}
+
+duplicated(mydf)
+table(duplicated(mydf))
+
+# Duplicated values are absent.
+
+```
+
+# f) Checking for missing values
+
+```{r}
+
+colSums(is.na(mydf))
+
+# Missing values are absent.
+
+```
+
+# g) Checking for numerical summaries
+
+```{r}
+
+summary(mydf)
+
+```
+
+# Summary Insights : Square meter ie mq variable cannot be 0.
+Hence we replace 0 with mean value for mq
+
+```{r}
+
+# Display row from the data frame with incorrect value for Square meter
+subset(mydf, mq == 0 )
+
+# Replacing 0 with median value of mq
+median(mydf$mq)
+
+mydf$mq[mydf$mq== 0] <- 100
+
+summary(mydf)
+
+```
+
+
+# 2. Exploratory Data Analysis (EDA)
+
+## 2.1 EDA plan
+
+# The Exploratory Data Analysis steps are :
+"Price" column is our dependent or response variable. Mostly all graphical insights will be centered towards "Price".
+a) Structure of dataframe :
+  - Dimensions of data frame
+  - Variable names 
+  - Data type of each variable
+  - Comprehensive understanding of the data frame
+
+b) Numerical Summary of data :
+  - Checking Numerical parameters of Descriptive Statistics ie Minimum value, 1st Quantile, Median, Mean, 3rd Quantile, Maximum. This helps to understand abnormal values or any outliers. 
+
+c) Graphical Summaries :
+  - Descriptive statistics using visualizations.
+  - Histogram for frequency distribution of numerical variables and checking if data is normally distributed.
+  - Scatter plots to check correlation between 2 numerical variables.Are they positively, negatively or not correlated.
+  - Scatter plots : Slope/ relation => linear, quadratic , exponential  
+  - Box plots for categorical and factorial variables with Price.
+
+d) Checking for Normality :
+  - Normality test :  shapiro test , histograms
+  - Checking if the data falls under normal distribution or is positively or negatively skewed.
+  - Using psych library for checking skewness
+  - Finding possible reasons for skewness eg outliers
+
+e) Numerically checking for Correlation between variables using cor.test
+
+f) Understanding the research question and formulating appropiate hypothesis.
+
+
+## 2.2 EDA and summary of results  
+
+# Exploratory Data Analysis
+a) Understanding Data frame 
+
+Insights : 
+ - Total 903 observations ie rows and 12 columns.
+ - Data type of price is numerical and rest other variables are numerical and converted to factors.
+ - Factor levels : 0 = absent 1 = present
+ 
+```{r}
+
+str(mydf)
+
+```
+
+b) Numerical summary of Descriptive statistics
+
+Insights :
+  - price variable : Mean > Median Value implies positively skewed data, might be indicative of outliers.
+  - mq variable : Mean > Median implies positive skewness
+  - Numerical Variables like floor, n_rooms, n_bathrooms are discrete values
+  - floor : range is greater ie 14 for floor variable. This indicates outliers.
+  - Factorial variables : have no known anomalies
+  
+
+```{r}
+
+summary(mydf)
+
+# Using psych package 
+
+library(psych) 
+describe(mydf)
+
+```
+
+c) Histograms : Numerical variables (checking for frequency distribution, normal distribution)
+
+Insights :
+   - price variable : Histogram is slight positive skewed. Nearly normal distribution with maximum frequency of price between 50000-100000.
+   - mq variable : Histogram is positively skewed. Outliers present between 400-600 square meters of property.
+   - floor variable : edge/outlier present ie 14th floor. Maximum frequency/mode is for 1 floor.
+   - n_rooms : Normally distributed. No abnormalities seen. Mode = 3 rooms.
+   - n_bathrooms : Descending curve. Frequency of bathrooms = 1 > 2 > 3
+   
+   
+```{r}
+# Histogram of price variable
+hist(mydf$price, xlab="House Price", ylab="Count", main="Histogram : House Prices", col = "pink") 
+
+# Histogram of mq variable
+hist(mydf$mq, xlab="Property Area", ylab="Count", main="Histogram : Property Area", col = "green") 
+
+# Histogram of floor variable
+hist(mydf$floor, xlab="Number of Floors", ylab="Count", main="Histogram : Numbers of Floors ", col = "yellow") 
+
+# Histogram of n_rooms variable
+hist(mydf$n_rooms, xlab="Number of Rooms", ylab="Count", main="Histogram : Numbers of Rooms ", col = "grey") 
+
+# Histogram of n_bathrooms variable
+hist(mydf$n_bathrooms, xlab="Number of Bathrooms", ylab="Count", main="Histogram : Numbers of Bathrooms ", col = "purple") 
+
+```
+
+d) Scatterplots between price variable and other exploratory numerical variables.
+
+Insights :
+  - price and mq : Weak positive correlation
+  - price and floor : No correlation
+  - price and number of rooms : No correlation
+  - price and number of bathrooms : No correlation
+  
+
+```{r}
+
+library(ggplot2)
+
+# Scatterplot between variables price and mq 
+ggplot(data =mydf, aes(x=mq, y=price)) + geom_point() + theme_classic() + ggtitle("Property Price vs Area of property") 
+
+# Scatterplot between variables price and floor
+ggplot(data =mydf, aes(x=floor, y=price)) + geom_point() + theme_classic() + ggtitle("Property Price vs Floors") 
+
+# Scatterplot between variables price and n_rooms
+ggplot(data =mydf, aes(x=n_rooms, y=price)) + geom_point() + theme_classic() + ggtitle("Property Price vs Number of Rooms") 
+
+# Scatterplot between variables price and n_bathrooms
+ggplot(data =mydf, aes(x=n_rooms, y=price)) + geom_point() + theme_classic() + ggtitle("Property Price vs Number of Bathrooms")
+
+```
+e) Correlation test : cor.test() between price variable and other exploratory numerical variables.
+
+Insights : Correlation coefficient values are as followings 
+  - price and mq : 0.28 implies very weak positive correlation
+  - price and floor : 0.03 implies no correlation
+  - price and number of rooms : 0.22 implies very weak positive correlation
+  - price and number of bathrooms : 0.37 implies weak positive correlation
+
+```{r}
+
+# Correlation between Property Price and Area of Property
+cor.test(mydf$price, mydf$mq)
+
+# Correlation between Property Price and Floors
+cor.test(mydf$price, mydf$floor)
+
+# Correlation between Property Price and Number of Rooms
+cor.test(mydf$price, mydf$n_rooms)
+
+# Correlation between Property Price and Number of Bathrooms
+cor.test(mydf$price, mydf$n_bathrooms)
+
+```
+
+f) Boxplots between price and other categorical/factorial exploratory variables
+
+Insights : 
+  - price and heating : Almost equal distribution of data in autonomous and other heating type. Autonomous heating has multiple outliers. Median value is approximately same for both.
+  - price and has_alarm : House with alarm system have greater price. Greater spread between median and maximum range indicates positive skewness in alarm houses.Houses without alarm system have multiple outliers.
+  - price and has_terrace : Median value is approximately same. Non-terraced houses have multiple outliers.
+  - price and has_airconditioning :  Median value is approximately same. Non-AC houses have multiple outliers. 
+  AC houses have slight positive skew.
+  - price and has_parking : Price of houses with parking < Price of houses without parking
+                            parking house box plot - positive skew
+                            Houses without parking - multiple outliers
+  - price and is_furnished : Equal variance in both furnished and not furnished houses. Outliers present in not furnished house. Price range for furnished house < price range for not furnished house
+  
+```{r}
+
+# Boxplot between price and heating
+ggplot(mydf, aes(x=heating, y=price)) + geom_boxplot(fill="steelblue2") + theme_classic() + labs(title="Box Plot of Heating by Property price") 
+
+# Boxplot between price and has_alarm
+ggplot(data = mydf, aes(x=has_alarm, y=price)) +geom_boxplot(fill="green") + theme_classic() + ggtitle("Box plot of Price by Alarm system ")
+
+# Boxplot between price and has_terrace
+ggplot(data = mydf, aes(x=has_terrace, y=price)) +geom_boxplot(fill="pink") + theme_classic() + ggtitle("Box plot of Price by Terrace")
+
+# Boxplot between price and has_airconditioning 
+ggplot(data = mydf, aes(x=has_terrace, y=price)) +geom_boxplot(fill="purple") + theme_classic() + ggtitle("Box plot of Price by Air Conditioning")
+
+
+# Boxplot between price and has_parking
+ggplot(data = mydf, aes(x=has_parking, y=price)) +geom_boxplot(fill="lightgreen") + theme_classic() + ggtitle("Box plot of Price by Parking")
+
+# Boxplot between price and is_furnished
+ggplot(data = mydf, aes(x=is_furnished, y=price)) +geom_boxplot(fill="yellow") + theme_classic() + ggtitle("Box plot of Price by Furnished")
+
+
+```
+
+
+## 2.3 Additional insights and issues
+
+Additional Insights :
+a) Price variable has very weak positive correlation coefficient with other numerical variables - correlation test
+b) Price variable has near normal distribution but variables like mq have high positive skewness and outliers. 
+c) Floor has extreme outlier ie 15th floor. Since it is not implausible value, we are not deleting the data.
+d) Frequency of : 
+      - non-terraced flats > terraced flats 
+      - flats without alarm system > flats with alarm system
+      - flats without air conditioner > flats with air conditioner
+      - flats without parking > flats with parking
+      - furnished flats > unfurnished flats
+e) Autonomous and other heating type have almost equal distribution and median value.
+f) There is very less variability of Price explained by exploratory variables graphically. 
+
+
+# 3. Modelling
+
+## 3.1 Explain your analysis plan
+
+Analysis Plan :
+
+a) Price variable is dependent numerical variable
+b) Exploratory variables are both numerical and factorial
+c) Multiple regression is an ideal way to analyse the data
+d) Before modelling, it is important to explore the data using numerical and graphical summaries
+e) Data cleaning should include :
+     - Removing invalid, implausible, missing data
+f) Data can be corrected by :
+      - verifying with the source, imputed, ignored, row deletion, replaced by median  
+g) Outliers must not be deleted as they provide meaningful insights
+h) Multi-collinearity check - variables using cor function
+i) Modelling starts from maximal model and is checked for significance, R-square value, Residual plots
+j) Extent of variability explained by the model determines goodness of fit
+k) Transformation measures to improve the model
+l) AIC (Akaike's Information Criteria) is used to assess model fit
+
+## 3.2 Build a model for property price
+
+Model for property price :
+a) Plotting graph to visualize correlation using pairs function
+Insights : 
+   - Mostly all parameters have zero or positive correlation with each other.
+   - Marked variations seen in the data
+
+
+```{r}
+
+mydf.subset <-subset(mydf, select=c("price", "mq", "floor", "n_rooms", "n_bathrooms")) 
+                                  
+pairs(mydf.subset)
+
+```
+
+b) Check multi-collinearity between variables
+Insights : No multi-collinearity between variables 
+
+```{r}
+
+cor(mydf.subset)
+
+```
+
+c) Maximal model - Multiple Regression 
+
+```{r}
+
+model.1<-lm(mydf$price ~ mydf$mq + mydf$floor + mydf$n_rooms + mydf$n_bathrooms + mydf$has_terrace + mydf$has_alarm + mydf$heating + mydf$has_air_conditioning + mydf$has_parking + mydf$is_furnished)
+
+```
+
+
+## 3.3 Critique model using relevant diagnostics
+
+a) Model Characteristics : 
+  - This model includes all the exploratory variables
+  - Coefficients floor and n_bathrooms are most significant followed by has_alarm1
+  - R square is less (18.26% )implies only 18.26% of variability is explained by independent variables.
+  - F statistic value is less ie 20.28
+  - The model is significant
+  
+b) Diagnostic Tests :
+  - Residual vs Fitted graph is slightly curved. 
+  - Heteroscedasticity seen - variance unevenly distributed data
+  - QQ Plot : S- shaped curve and Outliers present 
+  
+c) Potential Weakness :
+  - There is no significant relationship between price and factorial variables. The presence of factorial variables decreases the R square value.
+  - Also, weak correlation coefficient between price and other numerical variables resulted into less fit model
+  - Presence of multiple outliers disrupts homogeneous variability of data points
+  
+  
+
+```{r}
+
+summary(model.1)
+plot(model.1)
+
+```
+
+
+
+## 3.4 Suggest improvements to your model
+
+Improvements :
+a) Transformation - using step function for minimal adequate model
+b) Testing minimum adequate model - using summary and diagnostic plots
+
+Insights :
+a) Minimal adequate model - property price is significantly dependent on area, number of floors, number of bathrooms, alarm systems
+AIC=20556.08
+mydf$price ~ mydf$mq + mydf$floor + mydf$n_bathrooms + mydf$has_alarm
+
+b) Model Summary:
+    - Model has good acceptance of fit
+    - All coefficients have significance
+    - R-square is 18%
+    - F-statistic is significant ie 50.14
+
+c) Diagnostic Plots:
+    - Residual vs Fitted curve has improved. It is linear to horizontal axis
+    - Heteroscedasticity seen - variance unevenly distributed
+    - QQ Plot : Number of extreme outliers decreased
+    - Residual vs Leverage graph : Data points lie within Cook's distance. No significant anomaly seen
+    
+```{r}
+
+step(model.1)
+model.2 <-lm(mydf$price ~ mydf$mq + mydf$floor + mydf$n_bathrooms + mydf$has_alarm)
+summary(model.2)
+plot(model.2)
+
+```
+
+
+# 4. Extension work
+
+## 4.1 Model the likelihood of a property being furnished (using the is_furnished variable provided).
+
+Answer 4.1
+a) Check data type and frequency of is_furnished variable
+Insights : 
+   - is_furnished => factorial variable
+   - is_furnished has 2 values absent = 0, present = 1
+   - Dependent variable is is_furnished = Binary => Logistic Regression
+   - Exploratory variables are numerical and factorial
+   
+
+```{r}
+
+class(mydf$is_furnished)
+table(mydf$is_furnished)
+
+```
+
+b) Logistic Regression using Maximal model without Interactions
+Insights : 
+  - Intercept and Air Conditioning are significant coefficients
+  - AIC - 565.86
+  - Diagnostic Plots are not applicable to Logistic regression models
+  
+```{r}
+
+mydf.logit<-glm(mydf$is_furnished ~ mydf$price + mydf$mq + mydf$floor + mydf$n_rooms + mydf$n_bathrooms + mydf$has_terrace + mydf$has_alarm + mydf$heating + mydf$has_air_conditioning + mydf$has_parking , family=binomial)
+summary(mydf.logit)
+
+```
+
+c) Logistic Regression with Interactions 
+Insights :
+  - Multiple significant coefficients
+  - Larger analysis table 
+
+```{r}
+
+mydf.max.logit<-glm(mydf$is_furnished ~ mydf$price * mydf$mq * mydf$floor * mydf$n_rooms * mydf$n_bathrooms * mydf$has_terrace * mydf$has_alarm * mydf$heating * mydf$has_air_conditioning * mydf$has_parking , family=binomial)
+summary(mydf.max.logit)
+
+```
+
+d) Logistic Regression using Step Function on Maximal model without Interactions
+Insights :
+  - Only has_air_conditioning coefficient is significant after performing step function
+
+
+```{r}
+
+step(mydf.logit)
+
+
+```
+
+
+e) Logistic Regression with has_air_conditioning - Minimal adequate model
+  
+```{r}
+
+mydf.step.logit <- glm(formula = mydf$is_furnished ~ mydf$has_air_conditioning, 
+    family = binomial)
+summary(mydf.step.logit)
+
+```
+
+f) Calculating Odds Ratio on the Maximal model without Interactions
+
+```{r}
+
+exp(coef(mydf.logit))
+
+```
+
+
+# References  
+
+
+CS5701 Week 1 Teaching Materials (2022). Lecture 1:  Exploratory Data Analysis. Available at
+https://brightspace.brunel.ac.uk, accessed 20 December 2022.
+
+CS5701 Week 4 Teaching Materials (2022). Lecture 4:  Correlation and Regression. Available at
+https://brightspace.brunel.ac.uk, accessed 20 December 2022.
+
+CS5701 Week 6 Teaching Materials (2022). Lecture 6:  Multiple Regression. Available at
+https://brightspace.brunel.ac.uk, accessed 22 December 2022.
+
+CS5701 Week 7 Teaching Materials (2022). Lecture 6:  Logistic Regression. Available at
+https://brightspace.brunel.ac.uk, accessed 24 December 2022.
+
+CS5702 Week 4 Teaching Materials (2022). Lecture 4:   Exploratory data analysis (EDA). Available at
+https://brightspace.brunel.ac.uk, accessed 20 December 2022.
+
+CS5702 Week 5 Teaching Materials (2022). Lecture 5:   Data quality. Available at
+https://brightspace.brunel.ac.uk, accessed 23 December 2022.
+
+Crawley, M.J. 2015, Statistics: an introduction using R, Second edn, Wiley, Chichester, West Sussex.
+
+Kabacoff, R.I. 2015, R in Action, Second Edition, Manning Publications
+
+
+
+
+
+
